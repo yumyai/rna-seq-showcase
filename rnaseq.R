@@ -1,8 +1,10 @@
 # Install DESeq2 and data
-renv::init()
-renv::install("bioc::DESeq2")
-renv::install("bioc:apeglm") # For 
-renv::install(c("tidyverse", "bioc::tximport", "bioc::tximportData"))
+#renv::init()
+#renv::install("bioc::DESeq2")
+#renv::install("bioc:apeglm") # For 
+#renv::install(c("tidyverse", "bioc::tximport", "bioc::tximportData"))
+#renv::install("pheatmap")
+#renv::install("bioc::vsn", "hexbin)
 
 library("tximport")
 library("readr")
@@ -28,13 +30,31 @@ ddsTxi <- DESeqDataSetFromTximport(txi,
                                    colData = samples,
                                    design = ~ condition)
 
-#ddsTxi$condition <- factor(ddsTxi$condition, levels = c("untreated","treated"))
+# Prefiltering
+keep <- rowSums(counts(ddsTxi)) >= 10
+ddsTxi <- ddsTxi[keep,]
 
 dds <- DESeq(ddsTxi)
-res <- results(dds, contrast=c(""))
+
+res <- results(dds, contrast=c("condition", "B", "A"))
 resLFC <- lfcShrink(dds, coef="condition_B_vs_A", type="apeglm")
 plotCounts(dds, gene="ENSG00000000460.16", intgroup="condition")
 
+plotMA(res)
 plotMA(resLFC)
+
+vsd <- vst(dds, blind=FALSE)
+rld <- rlog(dds, blind=FALSE)
+
+library("pheatmap")
+select <- order(rowMeans(counts(dds,normalized=TRUE)),
+                decreasing=TRUE)[1:20]
+df <- as.data.frame(colData(vsd)["condition"])
+pheatmap(as.matrix(assay(vsd)[select,]),  cluster_rows=FALSE, show_rownames=FALSE,
+         cluster_cols=FALSE,annotation_col = df)
+
+
+# PCA
+plotPCA(vsd, intgroup=c("condition"))
 
 # More info in https://github.com/hbctraining/DGE_workshop/tree/master/lessons
